@@ -1,6 +1,7 @@
 from user_profiles import predefined_profiles, init_user_agent_from_profile
+from agents_profiles import all_in_one_agent
 from RAG_agent_definition import init_rag_agent_from_profile
-from app import process_prompt, save_meal_plan_to_csv
+from app import process_prompt, save_meal_plan_to_csv, reset_profile
 import os
 import streamlit as st
 import datetime
@@ -27,19 +28,10 @@ def chat_simulation_for_all_profiles():
 def chat_simulation(user_name):
     profile_data = predefined_profiles[user_name]
 
-    st.session_state.gender = profile_data["gender"]
-    st.session_state.age = profile_data["age"]
-    st.session_state.height = profile_data["size"]
-    st.session_state.weight = profile_data["weight"]
-    st.session_state.country = profile_data["country"]
-
-    if "user_name" in profile_data.keys():
-        st.session_state.user_name = profile_data["user_name"]
-    else:
-        st.session_state.user_name = "Unnamed User"
+    reset_profile(profile_data)
 
     user_llm, user_system_prompt = init_user_agent_from_profile(predefined_profiles[user_name])
-    conversational_rag_chain = init_rag_agent_from_profile()
+    conversational_rag_chain = init_rag_agent_from_profile(agent_profile=all_in_one_agent)
 
     file_name = f"Meal-Plan_{st.session_state.user_name}_{datetime.datetime.now().strftime('%Y-%m-%d %H-%M-%S')}.csv"
 
@@ -52,22 +44,32 @@ def chat_simulation(user_name):
     logger.info("Cocineco : ")
     logger.info(chat_message)
 
-    for i in range(10):
+    for _ in range(20):
         conversation = [("system", user_system_prompt)]
         conversation.append(("user", chat_message))
         user_response = user_llm.invoke(input=conversation).content
-        logger.info("%s : ", user_name)
-        logger.info(user_response)
+        logger.info("==========================================================")
+        logger.info("= %s : ", user_name)
+        logger.info("= %s : ", user_response)
+        logger.info("==========================================================")
 
         chat_message, context, chat_history = process_prompt(
             user_response,
             conversational_rag_chain=conversational_rag_chain,
             chat_history=chat_history,
         )
-        logger.info("Cocineco : ")
-        logger.info(chat_message)
-
+        logger.info("==========================================================")
+        logger.info("= Cocineco : ")
+        logger.info("= Message : %s", chat_message)
+        logger.info("= Context : %s", context)
+        logger.info("==========================================================")
         if "```" in chat_message:
             save_meal_plan_to_csv(chat_message, file_name)
             print("!!! The chat is over !!!")
             break
+
+def main():
+    chat_simulation_for_all_profiles()
+
+if __name__ == "__main__":
+    main()
